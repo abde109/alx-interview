@@ -1,64 +1,49 @@
 #!/usr/bin/python3
+
 import sys
 import signal
-import re
 
-# Initialize the counters and variables
-total_size = 0
-status_counts = {
-    '200': 0,
-    '301': 0,
-    '400': 0,
-    '401': 0,
-    '403': 0,
-    '404': 0,
-    '405': 0,
-    '500': 0
-}
-line_count = 0
+def print_msg(dict_sc, total_file_size):
+    """
+    Method to print the accumulated statistics
+    """
+    print("File size: {}".format(total_file_size))
+    for key, val in sorted(dict_sc.items()):
+        if val != 0:
+            print("{}: {}".format(key, val))
 
-# Regular expression to parse the log lines
-log_pattern = re.compile(r'(\S+) - \[\S+ \S+\] "GET /projects/260 HTTP/1.1" (\d{3}) (\d+)')
-
-def print_stats():
-    """Prints the accumulated statistics."""
-    print("File size: {}".format(total_size))
-    for code in sorted(status_counts.keys()):
-        if status_counts[code] > 0:
-            print("{}: {}".format(code, status_counts[code]))
+# Initialize variables to hold the total file size and status code counts
+total_file_size = 0
+counter = 0
+dict_sc = {"200": 0, "301": 0, "400": 0, "401": 0, "403": 0, "404": 0, "405": 0, "500": 0}
 
 def signal_handler(sig, frame):
-    """Handles the keyboard interruption signal."""
-    print_stats()
+    """
+    Handles the keyboard interruption signal (CTRL + C)
+    """
+    print_msg(dict_sc, total_file_size)
     sys.exit(0)
 
 # Set up the signal handler for keyboard interruption
 signal.signal(signal.SIGINT, signal_handler)
 
-# Read and process each line from standard input
 try:
     for line in sys.stdin:
-        match = log_pattern.match(line)
-        if match:
-            status_code = match.group(2)
-            file_size = int(match.group(3))
-            
-            # Accumulate the total file size
-            total_size += file_size
-            
-            # Count the status code occurrence
-            if status_code in status_counts:
-                status_counts[status_code] += 1
+        parsed_line = line.split()  # Split the line into components
+        parsed_line = parsed_line[::-1]  # Reverse the components
 
-            line_count += 1
+        if len(parsed_line) > 2:
+            counter += 1
 
-            # Print statistics after every 10 lines
-            if line_count % 10 == 0:
-                print_stats()
-except KeyboardInterrupt:
-    # Handle the keyboard interruption if not caught by the signal handler
-    print_stats()
-    sys.exit(0)
+            total_file_size += int(parsed_line[0])  # Update total file size
+            code = parsed_line[1]  # Extract status code
 
-# Print the final statistics after reading all lines
-print_stats()
+            if code in dict_sc.keys():
+                dict_sc[code] += 1  # Increment the count for the status code
+
+            if counter == 10:
+                print_msg(dict_sc, total_file_size)  # Print stats every 10 lines
+                counter = 0
+
+finally:
+    print_msg(dict_sc, total_file_size)  # Print final stats on termination
